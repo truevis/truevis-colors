@@ -1,6 +1,6 @@
 # Color Explorer: English, Indonesian, Malay
 
-An interactive multilingual color explorer that lets you play with colors while pretending to be productive. Because apparently we needed another color tool.
+An interactive multilingual color explorer that lets you play with colors in three languages while pretending to be productive. Because apparently we needed another trilingual color tool.
 
 ## What fresh hell is this?
 
@@ -23,9 +23,10 @@ Built with:
 - iro.js color picker (because reinventing the wheel is overrated)
 - Pure JavaScript (no frameworks, we're old school like that)
 - Client-side everything (because servers are expensive)
+- Vibe-coded initially with Gemini 2.5 Flash
 
 ## Data Source
 
-Based on the "Daftar Istilah Warna" (1984) because apparently 40-year-old multilingual color lists are still relevant.
+Based on the "Daftar Istilah Warna" (1984) https://repositori.kemendikdasmen.go.id/1698/1/Daftar%20Istillah%20Warna%20%28%201984%20%29.pdf because apparently 40-year-old multilingual color lists are still relevant.
 
 Sponsored by truevis.com, presumably because they have nothing better to do.
