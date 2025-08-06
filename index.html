@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <title>Interactive Multilingual Color Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5/dist/iro.min.js"></script>
+    <!-- Chosen Palette: Warm Neutral Harmony -->
+    <!-- Application Structure Plan: The application is structured into two primary, task-oriented zones for optimal usability. Zone 1 is the 'Interactive Color Lab', containing the color wheel, specificity slider, and dynamic match results. This design places the core interactive task at the forefront. Zone 2 is the 'Comprehensive Data Reference', a full, searchable table of all color terms. This separation allows users to either engage in visual exploration or direct data lookup without clutter. This dual-zone approach was chosen over a linear report structure to better support the distinct user goals of discovery (visual matching) and reference (text search), creating a more intuitive and powerful user experience. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Multilingual color names. Goal: Parameterize and explore. Viz/Method: JavaScript array of objects. Interaction: N/A (data structure). Justification: Most efficient way to store and access structured data on the client.
+        - Report Info: User's need to select a color. Goal: Allow intuitive color selection. Viz/Method: Interactive Color Wheel. Interaction: User drags a handle to select a color. Justification: Standard, intuitive UI for selecting hue/saturation. Library: iro.js for its lightweight, event-driven nature.
+        - Report Info: Finding closest color names. Goal: Match selected color to the dataset. Viz/Method: Dynamic list of matched colors. Interaction: List updates automatically based on wheel/slider input. Justification: Provides immediate, relevant feedback. Logic: Euclidean distance in RGB space for simplicity and performance in a client-side app.
+        - Report Info: Need for broader/narrower matching. Goal: Control match sensitivity. Viz/Method: HTML Range Slider. Interaction: User drags slider to set a distance threshold. Justification: Standard UI for controlling a continuous value, intuitively mapping to "specificity".
+        - Report Info: Viewing all terms. Goal: Provide full data reference. Viz/Method: HTML Table. Interaction: Text input filters the table in real-time. Justification: Best for displaying and searching tabular data.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .iro__marker {
+            stroke: white;
+            stroke-width: 3;
+        }
+        .table-container {
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        /* Custom styles for iro.js sliders to add labels and spacing */
+        .iro__slider {
+            margin-top: 20px; /* Increased space above sliders */
+        }
+        .iro__slider::before {
+            content: attr(data-label);
+            display: block;
+            text-align: center;
+            font-size: 0.9em; /* Slightly larger font */
+            font-weight: 500; /* Make it a bit bolder */
+            color: #444; /* Darker color for better visibility */
+            margin-bottom: 8px; /* More space between label and slider */
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+
+        <header class="text-center mb-10">            
+            <h2 class="text-xl md:text-2xl font-semibold text-stone-700">Color Explorer: English, Indonesian, Malay</h2>
+            <p class="mt-2 text-lg text-stone-600">An interactive tool based on <a href="https://repositori.kemendikdasmen.go.id/1698/" target="_blank" class="text-blue-600 hover:text-blue-800 underline">Daftar Istilah Warna (1984)</a>  Sponsored by <a href="https://truevis.com" target="_blank" class="text-blue-600 hover:text-blue-800 underline">truevis.com</a></p>
+        </header>
+
+        <main>
+            <!-- Interactive Color Lab Section -->
+            <section id="interactive-lab" class="bg-white p-6 md:p-8 rounded-2xl shadow-lg mb-12">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    <!-- Left Side: Color Picker and Controls -->
+                    <div class="flex flex-col items-center">
+                        <h2 class="text-2xl font-bold mb-4 text-stone-700">1. Select a Color</h2>
+                        <!-- Removed fixed height classes to let iro.js determine height based on its components -->
+                        <div class="chart-container w-full max-w-sm mx-auto" id="color-picker-container"></div>
+                        
+                        <div class="w-full max-w-sm mt-12"> <!-- Increased margin-top for more separation -->
+                            <label for="specificity-slider" class="block text-center font-medium text-stone-600 mb-2">2. Adjust Matching Specificity</label>
+                            <div class="flex items-center gap-4">
+                                <span class="text-sm text-stone-500">Precise</span>
+                                <input id="specificity-slider" type="range" min="10" max="150" value="50" class="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer">
+                                <span class="text-sm text-stone-500">Broader</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Side: Match Results -->
+                    <div>
+                        <h2 class="text-2xl font-bold mb-4 text-stone-700">3. Possible Matches</h2>
+                        <div class="bg-stone-50 p-4 rounded-lg">
+                             <div class="flex items-center gap-4 mb-4 border-b border-stone-200 pb-4">
+                                <div id="selected-color-swatch" class="w-16 h-16 rounded-full border-4 border-white shadow-md flex-shrink-0"></div>
+                                <div>
+                                    <p class="font-bold text-stone-800">Selected Color</p>
+                                    <p id="selected-color-info" class="text-sm text-stone-600 font-mono"></p>
+                                </div>
+                            </div>
+                            <div id="matches-list" class="space-y-3">
+                                <p class="text-center text-stone-500 pt-8">Select a color on the wheel to see matches.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- Data Reference Section -->
+            <section id="data-reference" class="bg-white p-6 md:p-8 rounded-2xl shadow-lg">
+                <h2 class="text-2xl font-bold mb-4 text-stone-700">Complete Color Data Reference</h2>
+                <div class="mb-4">
+                    <input id="search-input" type="text" placeholder="Search by any name (English, Indonesian, Malay)..." class="w-full p-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="table-container border border-stone-200 rounded-lg">
+                    <table class="min-w-full divide-y divide-stone-200">
+                        <thead class="bg-stone-100 sticky top-0">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">English</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">Indonesian</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">Malay</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">Hex</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">RGB</th> <!-- Added RGB column header -->
+                            </tr>
+                        </thead>
+                        <tbody id="color-table-body" class="bg-white divide-y divide-stone-200">
+                            <!-- JS will populate this -->
+                        </tbody>
+                    </table>
+                </div>
+                 <p id="no-results-message" class="text-center text-stone-500 mt-4 hidden">No colors match your search.</p>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            const colorData = [
+                { english: "ash grey", indonesian: "abu-abu", malay: "kelabu arang", hex: "#B2BEB5" },
+                { english: "amaranth", indonesian: "acung", malay: "ungu lembayung", hex: "#E52B50" },
+                { english: "greyish magenta", indonesian: "acung", malay: "lembayung kelabu", hex: "#9F4576" },
+                { english: "dark green", indonesian: "balu", malay: "hijau tua", hex: "#006400" },
+                { english: "parsley green", indonesian: "balu", malay: "kuning kehijauan", hex: "#5A9F4D" },
+                { english: "salmon", indonesian: "bangbang", malay: "jingga kesumba", hex: "#FA8072" },
+                { english: "jade green", indonesian: "batu lumut", malay: "batu lumut", hex: "#00A86B" },
+                { english: "cardinal red", indonesian: "beram", malay: "merah cerah", hex: "#C41E3A" },
+                { english: "strawberry red", indonesian: "beram", malay: "merah fragaria", hex: "#C83F49" },
+                { english: "bluish madder red", indonesian: "beranang", malay: "beranang", hex: "#B7282E" },
+                { english: "brownish orange", indonesian: "biring", malay: "biring", hex: "#CC7722" },
+                { english: "brownish yellow", indonesian: "biring", malay: "biring/kuning coklat", hex: "#CC7722" },
+                { english: "reddish golden", indonesian: "biring", malay: "biring", hex: "#FFD700" },
+                { english: "blue", indonesian: "biru", malay: "biru", hex: "#0000FF" },
+                { english: "cyan blue", indonesian: "biru ben-hur", malay: "biru kehijauan", hex: "#14A3C7" },
+                { english: "Berlin blue", indonesian: "biru berlin", malay: "biru berlin/tua", hex: "#003153" },
+                { english: "dark blue", indonesian: "biru berlin", malay: "biru berlin/tua", hex: "#00008B" },
+                { english: "Milori blue", indonesian: "biru berlin", malay: "biru berlin/tua", hex: "#4B6F96" },
+                { english: "Paris blue", indonesian: "biru berlin", malay: "biru berlin/tua", hex: "#2D5C8A" },
+                { english: "flax blue", indonesian: "biru ceraka", malay: "biru rami", hex: "#7C9ED9" },
+                { english: "light purplish blue", indonesian: "biru ceraka", malay: "biru ceraka", hex: "#B3B3FF" },
+                { english: "primary blue", indonesian: "biru jelak", malay: "biru jelah", hex: "#0000FF" },
+                { english: "vivid blue", indonesian: "biru jelak", malay: "biru jelah", hex: "#4D4DFF" },
+                { english: "deep blue", indonesian: "biru kelasi", malay: "biru kelasi", hex: "#00008B" },
+                { english: "navy blue", indonesian: "biru kelasi", malay: "biru kelasi", hex: "#000080" },
+                { english: "azure blue", indonesian: "biru langit", malay: "biru langit", hex: "#007FFF" },
+                { english: "sky blue", indonesian: "biru langit", malay: "biru langit", hex: "#87CEEB" },
+                { english: "capri blue", indonesian: "biru laut", malay: "biru laut", hex: "#00BFFF" },
+                { english: "ice blue", indonesian: "biru laut", malay: "biru salji", hex: "#A6DCEF" },
+                { english: "sea blue", indonesian: "biru laut", malay: "biru laut", hex: "#006994" },
+                { english: "greyish blue", indonesian: "biru lebam", malay: "biru lebam", hex: "#6A8D9F" },
+                { english: "fog blue", indonesian: "biru panci", malay: "biru kabut", hex: "#C7D0D8" },
+                { english: "spectrum blue", indonesian: "biru pelangi", malay: "biru pelangi", hex: "#0000FF" },
+                { english: "turquois", indonesian: "biru pirus", malay: "firus", hex: "#40E0D0" },
+                { english: "turquois blue", indonesian: "biru porselen", malay: "biru firus", hex: "#00CED1" },
+                { english: "china blue", indonesian: "biru porselen", malay: "biru porselin", hex: "#85B6D0" },
+                { english: "porcelain blue", indonesian: "biru porselen", malay: "biru porselin", hex: "#A7C6ED" },
+                { english: "reddish blue", indonesian: "biru telang", malay: "biru telang", hex: "#4169E1" },
+                { english: "violet blue", indonesian: "biru telang", malay: "biru ungu", hex: "#8A2BE2" },
+                { english: "glaucous", indonesian: "biru telur itik", malay: "biru telur itik", hex: "#6082B6" },
+                { english: "greenish glaucous", indonesian: "biru telur itik", malay: "biru telur itik", hex: "#6B8E23" },
+                { english: "pale bluish green", indonesian: "bungalan", malay: "biru telur itik", hex: "#AFEEEE" },
+                { english: "buff", indonesian: "bungalan", malay: "kuning pucat", hex: "#F0DC82" },
+                { english: "raven black", indonesian: "cemani", malay: "boltam", hex: "#36454F" },
+                { english: "brown", indonesian: "coklat", malay: "coklat", hex: "#A52A2A" },
+                { english: "burnt amber", indonesian: "coklat", malay: "ambar rentung", hex: "#8A3324" },
+                { english: "chocolate brown", indonesian: "coklat", malay: "coklat coco", hex: "#7B3F00" },
+                { english: "Vandijke brown", indonesian: "coklat", malay: "coklat", hex: "#664228" },
+                { english: "clay brown", indonesian: "coklat lempung", malay: "coklat lempung", hex: "#9F7961" },
+                { english: "mahogany brown", indonesian: "coklat mahoni", malay: "coklat mahogani", hex: "#C04000" },
+                { english: "rosewood", indonesian: "coklat sampang", malay: "coklat sampang", hex: "#65000B" },
+                { english: "snuff brown", indonesian: "coklat tembakau", malay: "coklat tembakau", hex: "#8B4513" },
+                { english: "fulvous", indonesian: "deragem", malay: "coklat keemasan", hex: "#E48400" },
+                { english: "golden brown", indonesian: "deragem", malay: "dewangga", hex: "#996515" },
+                { english: "grenadine pink", indonesian: "dewangga", malay: "dewangga", hex: "#F08080" },
+                { english: "orange red", indonesian: "dewangga", malay: "dewangga", hex: "#FF4500" },
+                { english: "yellowish red", indonesian: "dewangga", malay: "dewangga", hex: "#FF0000" },
+                { english: "lavender", indonesian: "gandaria", malay: "gandaria", hex: "#E6E6FA" },
+                { english: "lavender blue", indonesian: "gandaria", malay: "biru gandaria", hex: "#CCCCFF" },
+                { english: "lavender grey", indonesian: "gandaria", malay: "kelabu gandaria", hex: "#C4C3D0" },
+                { english: "agate", indonesian: "gelam", malay: "gelam", hex: "#C0C0C0" },
+                { english: "henna", indonesian: "gelam", malay: "gelam", hex: "#993300" },
+                { english: "gamboge yellow", indonesian: "getah manggis", malay: "getah manggis", hex: "#E49B0F" },
+                { english: "ochre coloured", indonesian: "hartal", malay: "hartal", hex: "#CC7722" },
+                { english: "ochre yellow", indonesian: "hartal", malay: "hartal", hex: "#DAA520" },
+                { english: "bottle green", indonesian: "hijau botol", malay: "hijau botol", hex: "#006A4E" },
+                { english: "green", indonesian: "hijau", malay: "hijau", hex: "#008000" },
+                { english: "foliage green", indonesian: "hijau daun", malay: "hijau daun", hex: "#4E7C4F" },
+                { english: "herbage green", indonesian: "hijau daun", malay: "hijau daun", hex: "#657E42" },
+                { english: "leaf green", indonesian: "hijau daun", malay: "hijau daun", hex: "#71AA34" },
+                { english: "primary green", indonesian: "hijau jelak", malay: "hijau jelah", hex: "#00FF00" },
+                { english: "vivid green", indonesian: "hijau jelak", malay: "hijau jelah", hex: "#00FF00" },
+                { english: "khaki", indonesian: "hijau kaki", malay: "coklat zaitun", hex: "#F0E68C" },
+                { english: "olive brown", indonesian: "hijau kaki", malay: "coklat zaitun", hex: "#6B8E23" },
+                { english: "bluish green", indonesian: "hijau laut", malay: "hijau laut", hex: "#009966" },
+                { english: "deep sea green", indonesian: "hijau laut", malay: "hijau laut", hex: "#004B49" },
+                { english: "greenish olivaceous", indonesian: "hijau lumut", malay: "hijau lumut", hex: "#6B8E23" },
+                { english: "olivaceous", indonesian: "hijau lumut", malay: "hijau lumut", hex: "#929781" },
+                { english: "olive green", indonesian: "hijau lumut", malay: "hijau zaitun", hex: "#808000" },
+                { english: "serpentine green", indonesian: "hijau lumut", malay: "hijau lumut", hex: "#6C7C3F" },
+                { english: "parrot green", indonesian: "hijau nuri", malay: "hijau serindit/hijau nuri", hex: "#1C8000" },
+                { english: "spectrum green", indonesian: "hijau pelangi", malay: "hijau pelangi", hex: "#00FF00" },
+                { english: "yellowish green", indonesian: "hijau pupus", malay: "hijau pucuk pisang", hex: "#ADFF2F" },
+                { english: "grass green", indonesian: "hijau rumput", malay: "hijau rumput", hex: "#7CFC00" },
+                { english: "copper green", indonesian: "hijau tembaga", malay: "hijau tembaga", hex: "#A67C52" },
+                { english: "malachite green", indonesian: "hijau tembaga", malay: "hijau tembaga", hex: "#0BDA51" },
+                { english: "army green", indonesian: "hijau tentara", malay: "hijau tentara", hex: "#4B5320" },
+                { english: "emerald green", indonesian: "hijau zamrud", malay: "hijau zamrud", hex: "#50C878" },
+                { english: "black", indonesian: "hitam", malay: "hitam", hex: "#000000" },
+                { english: "coal black", indonesian: "hitam arang", malay: "hitam arang", hex: "#0A0A0A" },
+                { english: "intense black", indonesian: "hitam bogot", malay: "hitam legam", hex: "#000000" },
+                { english: "raven black", indonesian: "hitam gagak", malay: "hitam gagak", hex: "#36454F" },
+                { english: "negro black", indonesian: "hitam jangat", malay: "hitam janggi", hex: "#2C3539" },
+                { english: "pitch dark", indonesian: "hitam kelam", malay: "gelap pekat", hex: "#000000" },
+                { english: "pitch black", indonesian: "hitam kumbang", malay: "hitam jelaga/hitam kumbang", hex: "#000000" },
+                { english: "glistening black", indonesian: "hitam lakan", malay: "hitam merlit", hex: "#1A1A1A" },
+                { english: "pure black", indonesian: "hitam legam", malay: "hitam legam", hex: "#000000" },
+                { english: "brown black", indonesian: "hitam lotong", malay: "hitam coklat", hex: "#2C2C2C" },
+                { english: "dark greyish purple", indonesian: "hitam manis", malay: "hitam manggis", hex: "#362D3B" },
+                { english: "dark violet", indonesian: "hitam manis", malay: "ungu kebiruan", hex: "#9400D3" },
+                { english: "violet slate", indonesian: "hitam manis", malay: "ungu loh", hex: "#8A2BE2" },
+                { english: "inky black", indonesian: "hitam pekat", malay: "hitam dakwat", hex: "#0F0F0F" },
+                { english: "slate grey", indonesian: "hitam sabak", malay: "kelabu loh", hex: "#708090" },
+                { english: "swarthy", indonesian: "hitam usam", malay: "hitam usam", hex: "#423B3B" },
+                { english: "dark purple", indonesian: "ijas", malay: "ijas", hex: "#301934" },
+                { english: "deep reddish purple", indonesian: "ijas", malay: "ijas", hex: "#800080" },
+                { english: "plum", indonesian: "ijas", malay: "ijas", hex: "#8E4585" },
+                { english: "dark bluish green", indonesian: "indranila", malay: "indranila", hex: "#004B49" },
+                { english: "deep turquois", indonesian: "indranila", malay: "indranila", hex: "#00CED1" },
+                { english: "sooty", indonesian: "jelaga", malay: "jelaga", hex: "#706863" },
+                { english: "sooty black", indonesian: "jelaga", malay: "jelaga", hex: "#202020" },
+                { english: "high red", indonesian: "jelah", malay: "merah jelah", hex: "#FF0000" },
+                { english: "vivid red", indonesian: "jelah", malay: "merah jelah", hex: "#F70D1A" },
+                { english: "fraise", indonesian: "jernang", malay: "jernang", hex: "#A63A50" },
+                { english: "deep red", indonesian: "jerau", malay: "jerau", hex: "#8B0000" },
+                { english: "orange", indonesian: "jingga", malay: "jingga", hex: "#FFA500" },
+                { english: "orange coloured", indonesian: "jingga", malay: "jingga", hex: "#FFA500" },
+                { english: "methyl orange", indonesian: "jingga metil", malay: "jingga metil, metil jingga", hex: "#FF8C00" },
+                { english: "spectrum orange", indonesian: "jingga pelangi", malay: "jingga pelangi", hex: "#FF7F00" },
+                { english: "chesnut", indonesian: "kadru", malay: "berangan", hex: "#954535" },
+                { english: "chesnut brown", indonesian: "kadru", malay: "berangan", hex: "#954535" },
+                { english: "bay", indonesian: "kapisa", malay: "coklat kemerah-merahan", hex: "#A9402F" },
+                { english: "ferrugineus", indonesian: "karat", malay: "karat", hex: "#8B0000" },
+                { english: "rust brown", indonesian: "karat", malay: "karat", hex: "#8B4000" },
+                { english: "rust coloured", indonesian: "karat", malay: "karat", hex: "#B7410E" },
+                { english: "rusty", indonesian: "karat", malay: "karat", hex: "#B7410E" },
+                { english: "rusty red", indonesian: "karat", malay: "karat", hex: "#B7410E" },
+                { english: "cinnamon", indonesian: "kayu manis", malay: "kayu manis", hex: "#D2691E" },
+                { english: "amethyst", indonesian: "kecubung", malay: "kecubung, lembayung", hex: "#9966CC" },
+                { english: "lead coloured", indonesian: "kedam", malay: "warna timah", hex: "#7E7F7F" },
+                { english: "leaden grey", indonesian: "kedam", malay: "kelabu timah", hex: "#7C7F80" },
+                { english: "ash grey", indonesian: "kelabu", malay: "kelabu", hex: "#B2BEB5" },
+                { english: "battleship grey", indonesian: "kelabu armada", malay: "kelabu armada", hex: "#848482" },
+                { english: "smoke grey", indonesian: "kelabu asap", malay: "kelabu asap", hex: "#737373" },
+                { english: "smoky", indonesian: "kelabu asap", malay: "kelabu asap", hex: "#737373" },
+                { english: "mouse grey", indonesian: "kelabu tikus", malay: "kelabu tikus", hex: "#9E9E9E" },
+                { english: "iron grey", indonesian: "kelambaja", malay: "kelam besi", hex: "#717478" },
+                { english: "verdigris", indonesian: "kerak terusi", malay: "kerak terusi", hex: "#43B3AE" },
+                { english: "bright pastel pink", indonesian: "kesumba murup", malay: "kesumba murup", hex: "#FFB6C1" },
+                { english: "khaki", indonesian: "khaki", malay: "khaki", hex: "#F0E68C" },
+                { english: "white", indonesian: "putih", malay: "putih", hex: "#FFFFFF" },
+                { english: "red", indonesian: "merah", malay: "merah", hex: "#FF0000" },
+                { english: "blue", indonesian: "biru", malay: "biru", hex: "#0000FF" },
+                { english: "yellow", indonesian: "kuning", malay: "kuning", hex: "#FFFF00" },
+                { english: "magenta", indonesian: "magenta", malay: "magenta", hex: "#FF00FF" },
+                { english: "cyan", indonesian: "sian", malay: "sian", hex: "#00FFFF" },
+                { english: "purple", indonesian: "ungu", malay: "ungu", hex: "#800080" },
+                { english: "pink", indonesian: "merah jambu", malay: "merah jambu", hex: "#FFC0CB" },
+                { english: "lime", indonesian: "hijau limau", malay: "hijau limau", hex: "#00FF00" },
+                { english: "teal", indonesian: "biru-hijau", malay: "biru-hijau", hex: "#008080" },
+                { english: "indigo", indonesian: "nila", malay: "nila", hex: "#4B0082" },
+                { english: "violet", indonesian: "ungu lembayung", malay: "lembayung", hex: "#EE82EE" },
+                { english: "maroon", indonesian: "merah manggis", malay: "merah manggis", hex: "#800000" },
+                { english: "gold", indonesian: "emas", malay: "emas", hex: "#FFD700" },
+                { english: "silver", indonesian: "perak", malay: "perak", hex: "#C0C0C0" },
+                { english: "beige", indonesian: "krem", malay: "krem", hex: "#F5F5DC" },
+                { english: "honey colour", indonesian: "kuning madu", malay: "ambar madu", hex: "#FFD700" },
+                { english: "waxy yellow", indonesian: "kuning malam", malay: "kuning lilin", hex: "#FAD6A5" },
+                { english: "spectrum yellow", indonesian: "kuning pelangi", malay: "kuning pelangi", hex: "#FFD700" },
+                { english: "light reddish yellow", indonesian: "kuning telur", malay: "kuning telur", hex: "#FEEB84" },
+                { english: "egg yellow", indonesian: "kuning telur", malay: "kuning telur", hex: "#FDB813" },
+                { english: "yolk of egg", indonesian: "kuning telur", malay: "kuning telur", hex: "#FFEA00" },
+                { english: "genuine ultramarine", indonesian: "lazuardi", malay: "lazuardi", hex: "#3F00FF" },
+                { english: "lapis lazuli", indonesian: "lazuardi", malay: "lazuardi", hex: "#26438D" },
+                { english: "light purple", indonesian: "lembayung", malay: "ungu lembut", hex: "#C8A2C8" },
+                { english: "light reddish purple", indonesian: "lembayung", malay: "merah lembayung", hex: "#C8A2C8" },
+                { english: "light sedalringgan", indonesian: "lembayung", malay: "ungu lembut", hex: "#C8A2C8" },
+                { english: "orange chrome", indonesian: "mambang kuning", malay: "mambung kuning", hex: "#FF8C00" },
+                { english: "vinaceous", indonesian: "merah anggur", malay: "merah anggur", hex: "#B06500" },
+                { english: "wine red", indonesian: "merah anggur", malay: "merah anggur", hex: "#B00000" },
+                { english: "fire red", indonesian: "merah api", malay: "merah api", hex: "#FF0000" },
+                { english: "flame coloured", indonesian: "merah api", malay: "merah api", hex: "#E42D17" },
+                { english: "flame red", indonesian: "merah api", malay: "merah api", hex: "#E42D17" },
+                { english: "brick red", indonesian: "merah bata", malay: "merah bata", hex: "#CB4154" },
+                { english: "terra-cotta", indonesian: "merah bata", malay: "merah bata", hex: "#E2725B" },
+                { english: "violet red", indonesian: "merah bungsu", malay: "merah ungu", hex: "#EE82EE" },
+                { english: "lilac", indonesian: "merah bungsu", malay: "merah bungsu", hex: "#C8A2C8" },
+                { english: "pale red", indonesian: "merah dadu", malay: "merah pucat", hex: "#FFB6C1" },
+                { english: "pastel red", indonesian: "merah dadu", malay: "merah pucat", hex: "#FF6961" },
+                { english: "flesh coloured", indonesian: "merah daging", malay: "merah daging", hex: "#FFCC99" },
+                { english: "blood red", indonesian: "merah darah", malay: "merah darah", hex: "#880808" },
+                { english: "sanguine", indonesian: "merah darah", malay: "merah darah", hex: "#8A0303" },
+                { english: "purplish pink", indonesian: "merah delima", malay: "merah delima", hex: "#C154C1" },
+                { english: "tile red", indonesian: "merah genting", malay: "merah genting", hex: "#CB4154" },
+                { english: "liver brown", indonesian: "merah hati", malay: "merah hati", hex: "#534B4B" },
+                { english: "reddish violet", indonesian: "merah jambu", malay: "merah jambu", hex: "#C71585" },
+                { english: "pink", indonesian: "merah jambu", malay: "merah jambu", hex: "#FFC0CB" },
+                { english: "rosy pink", indonesian: "merah kesumba", malay: "merah jambu", hex: "#FF66CC" },
+                { english: "Indian lake", indonesian: "merah kesumba", malay: "merah danau", hex: "#8A0303" },
+                { english: "lake red", indonesian: "merah kesumba", malay: "merah danau", hex: "#8A0303" },
+                { english: "magenta", indonesian: "merah lembayung", malay: "merah lembayung", hex: "#FF00FF" },
+                { english: "red purple", indonesian: "merah lembayung", malay: "merah lembayung", hex: "#800080" },
+                { english: "capsicum red", indonesian: "merah lombok", malay: "merah lata/merah cabai", hex: "#D43F3F" },
+                { english: "paprika red", indonesian: "merah lombok", malay: "merah lata/merah cabai", hex: "#E94E00" },
+                { english: "violet brown", indonesian: "merah manggis", malay: "merah manggis", hex: "#5C4033" },
+                { english: "soarlet", indonesian: "merah masak", malay: "merah mawar", hex: "#FF2400" },
+                { english: "rose red", indonesian: "merah mawar", malay: "merah mawar", hex: "#C21807" },
+                { english: "madder red", indonesian: "merah mengkudu", malay: "merah mengkudu", hex: "#B7282E" },
+                { english: "coral red", indonesian: "merah merjan", malay: "merah merjan", hex: "#FF4040" },
+                { english: "jasper red", indonesian: "merah merjan", malay: "merah merjan", hex: "#D9381E" },
+                { english: "cinnabar red", indonesian: "merah merona", malay: "merah merona", hex: "#E34234" },
+                { english: "vermillion", indonesian: "merah merona", malay: "merah merona", hex: "#E34234" },
+                { english: "bright red", indonesian: "merah murup", malay: "merah murup/menyala", hex: "#FF0000" },
+                { english: "shining red", indonesian: "merah padarn", malay: "merah padam", hex: "#FF0000" },
+                { english: "bluish red", indonesian: "merah padarn", malay: "merah lembayung", hex: "#FF0000" },
+                { english: "crimson", indonesian: "merah padarn", malay: "merah lembayung", hex: "#DC143C" },
+                { english: "spectrum red", indonesian: "merah pelangi", malay: "merah pelangi", hex: "#FF0000" },
+                { english: "dull red", indonesian: "merah sepang", malay: "merah senduduk", hex: "#8B0000" },
+                { english: "carmine", indonesian: "merah sepang", malay: "merah senduduk", hex: "#960018" },
+                { english: "cochineal", indonesian: "merah sepang", malay: "merah senduduk", hex: "#960018" },
+                { english: "pure red", indonesian: "merah serah", malay: "merah serah", hex: "#FF0000" },
+                { english: "laterite red", indonesian: "merah tanah liat", malay: "merah tanah", hex: "#CD5C5C" },
+                { english: "copper red", indonesian: "merah tembaga", malay: "merah tembaga", hex: "#CB6D51" },
+                { english: "lobster red", indonesian: "merah tembaga", malay: "merah tembaga", hex: "#CC2200" },
+                { english: "colour of ripening crop", indonesian: "merah udang", malay: "merah udang", hex: "#FF5733" },
+                { english: "indigo", indonesian: "nila", malay: "nila", hex: "#4B0082" },
+                { english: "indigo blue", indonesian: "nila", malay: "nila", hex: "#3F00FF" },
+                { english: "dark grey", indonesian: "nila", malay: "kelabu tua", hex: "#A9A9A9" },
+                { english: "king blue", indonesian: "nilakandi", malay: "nilakandi", hex: "#6A5ACD" },
+                { english: "royal blue", indonesian: "nilakandi", malay: "nilakandi", hex: "#4169E1" },
+                { english: "sapphire blue", indonesian: "nilakandi", malay: "nilakandi", hex: "#0F52BA" },
+                { english: "dark cyan blue", indonesian: "nilakandi", malay: "nilakandi", hex: "#008B8B" },
+                { english: "greenish white", indonesian: "nusa indah", malay: "putih kehijauan", hex: "#F0FFF0" },
+                { english: "deep magenta", indonesian: "patma", malay: "seroja", hex: "#8B008B" },
+                { english: "bronze brown", indonesian: "patma", malay: "perunggu", hex: "#622A0F" },
+                { english: "apricot", indonesian: "perunggu", malay: "pinang masak", hex: "#FBCEB1" },
+                { english: "apricot coloured", indonesian: "perunggu", malay: "pinang masak", hex: "#FBCEB1" },
+                { english: "dark greyish brown", indonesian: "pinggala", malay: "coklat gelap tua", hex: "#654321" },
+                { english: "dusky brown", indonesian: "pinggala", malay: "coklat gelap tua", hex: "#654321" },
+                { english: "fusceous", indonesian: "pinggala", malay: "coklat gelap tua", hex: "#654321" },
+                { english: "russet", indonesian: "pinggala", malay: "russet", hex: "#80461B" },
+                { english: "sallow", indonesian: "pinggala", malay: "perang kuning", hex: "#B09050" },
+                { english: "rosy buff", indonesian: "pirang", malay: "pirang", hex: "#FDD2B4" },
+                { english: "royal pink", indonesian: "pirang", malay: "nilakandi", hex: "#E38FB3" },
+                { english: "russet", indonesian: "pirang", malay: "nilakandi", hex: "#80461B" },
+                { english: "rust brown", indonesian: "pirang", malay: "karat", hex: "#8B4000" },
+                { english: "rust coloured", indonesian: "pirang", malay: "karat", hex: "#B7410E" },
+                { english: "rusty", indonesian: "pirang", malay: "karat", hex: "#B7410E" },
+                { english: "rusty red", indonesian: "pirang", malay: "karat", hex: "#B7410E" },
+                { english: "saffron yellow", indonesian: "pirang perus", malay: "kuning semu", hex: "#F4C430" },
+                { english: "salmon", indonesian: "pirang perus", malay: "bangbang", hex: "#FA8072" },
+                { english: "sapphire blue", indonesian: "pirang perus", malay: "nilakandi", hex: "#0F52BA" },
+                { english: "sea blue", indonesian: "pirang perus", malay: "biru laut", hex: "#006994" },
+                { english: "serpentine green", indonesian: "pirang perus", malay: "hijau lumut", hex: "#6C7C3F" },
+                { english: "sheet white", indonesian: "putih", malay: "putih", hex: "#FFFFFF" },
+                { english: "shining white", indonesian: "putih", malay: "putih", hex: "#FFFFFF" },
+                { english: "shocking pink", indonesian: "putih", malay: "merah jambu", hex: "#FC0FC0" },
+                { english: "signal yellow", indonesian: "putih", malay: "kuning sinyal", hex: "#FDD700" },
+                { english: "silvery", indonesian: "putih", malay: "putih", hex: "#C0C0C0" },
+                { english: "sky blue", indonesian: "putih", malay: "biru langit", hex: "#87CEEB" },
+                { english: "slate grey", indonesian: "putih", malay: "hitam sabak", hex: "#708090" },
+                { english: "smoke grey", indonesian: "putih", malay: "kelabu asap", hex: "#737373" },
+                { english: "smoky", indonesian: "putih", malay: "kelabu asap", hex: "#737373" },
+                { english: "snow white", indonesian: "putih", malay: "putih salju", hex: "#FFFAFA" },
+                { english: "sooty black", indonesian: "putih", malay: "jelaga", hex: "#202020" },
+                { english: "spectrum blue", indonesian: "putih", malay: "biru pelangi", hex: "#0000FF" },
+                { english: "spectrum green", indonesian: "putih", malay: "hijau pelangi", hex: "#00FF00" },
+                { english: "spectrum orange", indonesian: "putih", malay: "jingga pelangi", hex: "#FF7F00" },
+                { english: "spectrum red", indonesian: "putih", malay: "merah pelangi", hex: "#FF0000" },
+                { english: "spectrum yellow", indonesian: "putih", malay: "kuning pelangi", hex: "#FFD700" },
+                { english: "strawberry red", indonesian: "putih", malay: "merah fragaria", hex: "#C83F49" },
+                { english: "sunburn yellow", indonesian: "putih", malay: "kuning jerami", hex: "#E47A2E" },
+                { english: "sulphur yellow", indonesian: "putih", malay: "kuning belerang", hex: "#FFEF00" },
+                { english: "swarthy", indonesian: "putih", malay: "hitam usam", hex: "#423B3B" },
+                { english: "tan", indonesian: "sawa matang", malay: "kelabu tengah", hex: "#D2B48C" },
+                { english: "terra-cotta", indonesian: "merah bata", malay: "merah bata", hex: "#E2725B" },
+                { english: "tile red", indonesian: "merah genting", malay: "merah genting", hex: "#CB4154" },
+                { english: "tiflian red", indonesian: "merah genting", malay: "rambut jagung", hex: "#C70039" },
+                { english: "turquois", indonesian: "biru pirus", malay: "biru pirus", hex: "#40E0D0" },
+                { english: "turquois blue", indonesian: "biru pirus", malay: "biru pirus", hex: "#00CED1" },
+                { english: "ultramarine", indonesian: "ungu", malay: "biru pekat", hex: "#3F00FF" },
+                { english: "umber", indonesian: "ungu", malay: "serbuk kayu", hex: "#635147" },
+                { english: "unblemish white", indonesian: "putih bersih", malay: "putih bersih", hex: "#F8F8F8" },
+                { english: "Vandijke brow", indonesian: "coklat", malay: "coklat", hex: "#664228" },
+                { english: "verdigris", indonesian: "kerak terusi", malay: "kerak terusi", hex: "#43B3AE" },
+                { english: "vinaceous", indonesian: "merah anggur", malay: "merah anggur", hex: "#B06500" },
+                { english: "violet", indonesian: "ungu", malay: "ungu", hex: "#EE82EE" },
+                { english: "violet blue", indonesian: "ungu", malay: "biru telang", hex: "#8A2BE2" },
+                { english: "violet brown", indonesian: "ungu", malay: "merah manggis", hex: "#5C4033" },
+                { english: "violet red", indonesian: "ungu", malay: "merah bawang", hex: "#EE82EE" },
+                { english: "violet slate", indonesian: "ungu", malay: "hitam manggis", hex: "#8A2BE2" },
+                { english: "vivid blue", indonesian: "biru jelak", malay: "biru jelah", hex: "#4D4DFF" },
+                { english: "vivid green", indonesian: "hijau jelak", malay: "hijau jelah", hex: "#00FF00" },
+                { english: "vivid red", indonesian: "jelah", malay: "merah jelah", hex: "#F70D1A" },
+                { english: "vivid yellow", indonesian: "kuning", malay: "kuning kunyit", hex: "#FFFF00" },
+                { english: "white", indonesian: "putih", malay: "putih", hex: "#FFFFFF" },
+                { english: "white-as-a-swan", indonesian: "putih", malay: "putih angsa", hex: "#FFFFFF" },
+                { english: "white washed", indonesian: "putih", malay: "putih", hex: "#FFFFFF" },
+                { english: "white red", indonesian: "putih", malay: "putih", hex: "#FF0000" },
+                { english: "wood brown", indonesian: "coklat", malay: "coklat", hex: "#664228" },
+                { english: "yellow", indonesian: "kuning", malay: "kuning", hex: "#FFFF00" },
+                { english: "yellowish green", indonesian: "hijau pupus", malay: "hijau pupus", hex: "#ADFF2F" },
+                { english: "yellowish orange", indonesian: "kuning jenar", malay: "kuning jenar", hex: "#FFAA00" },
+                { english: "yellowish red", indonesian: "dewangga", malay: "dewangga", hex: "#FF0000" },
+                { english: "yolk of egg", indonesian: "kuning telur", malay: "kuning telur", hex: "#FFEA00" }
+            ].map(c => ({ ...c, rgb: hexToRgb(c.hex) }));
+
+            const colorPickerContainer = document.getElementById('color-picker-container');
+            const selectedColorSwatch = document.getElementById('selected-color-swatch');
+            const selectedColorInfo = document.getElementById('selected-color-info');
+            const matchesList = document.getElementById('matches-list');
+            const specificitySlider = document.getElementById('specificity-slider');
+            const searchInput = document.getElementById('search-input');
+            const tableBody = document.getElementById('color-table-body');
+            const noResultsMessage = document.getElementById('no-results-message');
+
+            let colorPicker;
+
+            function hexToRgb(hex) {
+                if (!hex) return { r: 0, g: 0, b: 0 };
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16)
+                } : { r: 0, g: 0, b: 0 };
+            }
+
+            function rgbDistance(rgb1, rgb2) {
+                const r = rgb1.r - rgb2.r;
+                const g = rgb1.g - rgb2.g;
+                const b = rgb1.b - rgb2.b;
+                return Math.sqrt(r * r + g * g + b * b);
+            }
+
+            function updateMatches(selectedColor) {
+                const threshold = parseFloat(specificitySlider.value);
+                const matches = colorData
+                    .map(color => ({
+                        ...color,
+                        distance: rgbDistance(selectedColor.rgb, color.rgb)
+                    }))
+                    .filter(color => color.distance <= threshold)
+                    .sort((a, b) => a.distance - b.distance);
+
+                selectedColorSwatch.style.backgroundColor = selectedColor.hexString;
+                selectedColorInfo.textContent = `${selectedColor.hexString.toUpperCase()} - RGB(${selectedColor.rgb.r}, ${selectedColor.rgb.g}, ${selectedColor.rgb.b})`;
+
+                matchesList.innerHTML = '';
+                if (matches.length > 0) {
+                    matches.slice(0, 7).forEach(match => {
+                        const matchEl = document.createElement('div');
+                        matchEl.className = 'flex items-center gap-3 p-2 rounded-md hover:bg-stone-200 transition-colors duration-150';
+                        matchEl.innerHTML = `
+                            <div class="w-8 h-8 rounded-md border border-stone-300 flex-shrink-0" style="background-color: ${match.hex};"></div>
+                            <div class="flex-grow">
+                                <p class="font-semibold text-sm text-stone-800">${match.english}</p>
+                                <p class="text-xs text-stone-500">${match.indonesian} / ${match.malay}</p>
+                            </div>
+                            <span class="text-xs font-mono text-stone-400">${match.distance.toFixed(1)}</span>
+                        `;
+                        matchesList.appendChild(matchEl);
+                    });
+                } else {
+                    matchesList.innerHTML = '<p class="text-center text-stone-500 pt-8">No matches found at this specificity. Try moving the slider to "Broader".</p>';
+                }
+            }
+
+            function populateTable(data) {
+                tableBody.innerHTML = '';
+                if (data.length === 0) {
+                    noResultsMessage.classList.remove('hidden');
+                    return;
+                }
+                noResultsMessage.classList.add('hidden');
+                data.forEach(color => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-stone-50';
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900 flex items-center gap-3">
+                            <div class="w-5 h-5 rounded-full border border-stone-200" style="background-color: ${color.hex};"></div>
+                            ${color.english}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">${color.indonesian}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">${color.malay}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500 font-mono">${color.hex.toUpperCase()}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500 font-mono">RGB(${color.rgb.r}, ${color.rgb.g}, ${color.rgb.b})</td> <!-- Added RGB cell -->
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            function handleSearch() {
+                const query = searchInput.value.toLowerCase();
+                const filteredData = colorData.filter(color => 
+                    color.english.toLowerCase().includes(query) ||
+                    color.indonesian.toLowerCase().includes(query) ||
+                    color.malay.toLowerCase().includes(query)
+                );
+                populateTable(filteredData);
+            }
+
+            colorPicker = new iro.ColorPicker(colorPickerContainer, {
+                width: colorPickerContainer.clientWidth,
+                color: "#ff0000",
+                borderWidth: 2,
+                borderColor: "#fff",
+                layout: [
+                    { component: iro.ui.Wheel },
+                    { component: iro.ui.Slider, options: { sliderType: 'saturation' } },
+                    { component: iro.ui.Slider, options: { sliderType: 'value' } },
+                ]
+            });
+
+            // Add data-label attribute to iro.js sliders for custom CSS labeling
+            // This needs to be done after the colorPicker is initialized and its elements are in the DOM
+            setTimeout(() => {
+                const iroSliders = colorPickerContainer.querySelectorAll('.iro__slider');
+                if (iroSliders.length > 0) {
+                    iroSliders[0].setAttribute('data-label', 'Saturation');
+                }
+                if (iroSliders.length > 1) {
+                    iroSliders[1].setAttribute('data-label', 'Brightness');
+                }
+            }, 0); // Use setTimeout to ensure DOM elements are rendered by iro.js
+
+            colorPicker.on('color:change', updateMatches);
+            specificitySlider.addEventListener('input', () => updateMatches(colorPicker.color));
+            searchInput.addEventListener('input', handleSearch);
+
+            populateTable(colorData);
+            updateMatches(colorPicker.color);
+
+            window.addEventListener('resize', () => {
+                colorPicker.resize(colorPickerContainer.clientWidth);
+            });
+        });
+    </script>
+</body>
+</html>
