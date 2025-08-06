@@ -104,11 +104,36 @@
                     <table class="min-w-full divide-y divide-stone-200">
                         <thead class="bg-stone-100 sticky top-0">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">English</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">Indonesian</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">Malay</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">Hex</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">RGB</th> <!-- Added RGB column header -->
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider cursor-pointer hover:bg-stone-200 transition-colors duration-150" data-sort="english">
+                                    <div class="flex items-center gap-2">
+                                        English
+                                        <span class="sort-indicator text-blue-600">↓</span>
+                                    </div>
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider cursor-pointer hover:bg-stone-200 transition-colors duration-150" data-sort="indonesian">
+                                    <div class="flex items-center gap-2">
+                                        Indonesian
+                                        <span class="sort-indicator opacity-30">↓</span>
+                                    </div>
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider cursor-pointer hover:bg-stone-200 transition-colors duration-150" data-sort="malay">
+                                    <div class="flex items-center gap-2">
+                                        Malay
+                                        <span class="sort-indicator opacity-30">↓</span>
+                                    </div>
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider cursor-pointer hover:bg-stone-200 transition-colors duration-150" data-sort="hex">
+                                    <div class="flex items-center gap-2">
+                                        Hex
+                                        <span class="sort-indicator opacity-30">↓</span>
+                                    </div>
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider cursor-pointer hover:bg-stone-200 transition-colors duration-150" data-sort="rgb">
+                                    <div class="flex items-center gap-2">
+                                        RGB
+                                        <span class="sort-indicator opacity-30">↓</span>
+                                    </div>
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="color-table-body" class="bg-white divide-y divide-stone-200">
@@ -268,7 +293,6 @@
                 { english: "khaki", indonesian: "khaki", malay: "khaki", hex: "#F0E68C" },
                 { english: "white", indonesian: "putih", malay: "putih", hex: "#FFFFFF" },
                 { english: "red", indonesian: "merah", malay: "merah", hex: "#FF0000" },
-                { english: "blue", indonesian: "biru", malay: "biru", hex: "#0000FF" },
                 { english: "yellow", indonesian: "kuning", malay: "kuning", hex: "#FFFF00" },
                 { english: "magenta", indonesian: "magenta", malay: "magenta", hex: "#FF00FF" },
                 { english: "cyan", indonesian: "sian", malay: "sian", hex: "#00FFFF" },
@@ -407,16 +431,13 @@
                 { english: "violet brown", indonesian: "ungu", malay: "merah manggis", hex: "#5C4033" },
                 { english: "violet red", indonesian: "ungu", malay: "merah bawang", hex: "#EE82EE" },
                 { english: "violet slate", indonesian: "ungu", malay: "hitam manggis", hex: "#8A2BE2" },
-                { english: "vivid blue", indonesian: "biru jelak", malay: "biru jelah", hex: "#4D4DFF" },
                 { english: "vivid green", indonesian: "hijau jelak", malay: "hijau jelah", hex: "#00FF00" },
                 { english: "vivid red", indonesian: "jelah", malay: "merah jelah", hex: "#F70D1A" },
                 { english: "vivid yellow", indonesian: "kuning", malay: "kuning kunyit", hex: "#FFFF00" },
-                { english: "white", indonesian: "putih", malay: "putih", hex: "#FFFFFF" },
                 { english: "white-as-a-swan", indonesian: "putih", malay: "putih angsa", hex: "#FFFFFF" },
                 { english: "white washed", indonesian: "putih", malay: "putih", hex: "#FFFFFF" },
                 { english: "white red", indonesian: "putih", malay: "putih", hex: "#FF0000" },
                 { english: "wood brown", indonesian: "coklat", malay: "coklat", hex: "#664228" },
-                { english: "yellow", indonesian: "kuning", malay: "kuning", hex: "#FFFF00" },
                 { english: "yellowish green", indonesian: "hijau pupus", malay: "hijau pupus", hex: "#ADFF2F" },
                 { english: "yellowish orange", indonesian: "kuning jenar", malay: "kuning jenar", hex: "#FFAA00" },
                 { english: "yellowish red", indonesian: "dewangga", malay: "dewangga", hex: "#FF0000" },
@@ -433,6 +454,8 @@
             const noResultsMessage = document.getElementById('no-results-message');
 
             let colorPicker;
+            let currentSort = { field: 'english', direction: 'asc' };
+            let currentData = [...colorData];
 
             function hexToRgb(hex) {
                 if (!hex) return { r: 0, g: 0, b: 0 };
@@ -484,14 +507,53 @@
                 }
             }
 
+            function sortData(data, field, direction) {
+                const sortedData = [...data].sort((a, b) => {
+                    let aVal, bVal;
+                    
+                    if (field === 'rgb') {
+                        // Sort by RGB sum for RGB column
+                        aVal = a.rgb.r + a.rgb.g + a.rgb.b;
+                        bVal = b.rgb.r + b.rgb.g + b.rgb.b;
+                    } else {
+                        aVal = a[field].toLowerCase();
+                        bVal = b[field].toLowerCase();
+                    }
+                    
+                    if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+                    if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+                return sortedData;
+            }
+
+            function updateSortIndicators(activeField, direction) {
+                const headers = document.querySelectorAll('[data-sort]');
+                headers.forEach(header => {
+                    const indicator = header.querySelector('.sort-indicator');
+                    if (header.dataset.sort === activeField) {
+                        indicator.textContent = direction === 'asc' ? '↓' : '↑';
+                        indicator.classList.remove('opacity-30');
+                        indicator.classList.add('text-blue-600');
+                    } else {
+                        indicator.textContent = '↓';
+                        indicator.classList.add('opacity-30');
+                        indicator.classList.remove('text-blue-600');
+                    }
+                });
+            }
+
             function populateTable(data) {
+                // Sort the data before displaying
+                const sortedData = sortData(data, currentSort.field, currentSort.direction);
+                
                 tableBody.innerHTML = '';
-                if (data.length === 0) {
+                if (sortedData.length === 0) {
                     noResultsMessage.classList.remove('hidden');
                     return;
                 }
                 noResultsMessage.classList.add('hidden');
-                data.forEach(color => {
+                sortedData.forEach(color => {
                     const row = document.createElement('tr');
                     row.className = 'hover:bg-stone-50';
                     row.innerHTML = `
@@ -502,7 +564,7 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">${color.indonesian}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">${color.malay}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500 font-mono">${color.hex.toUpperCase()}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500 font-mono">RGB(${color.rgb.r}, ${color.rgb.g}, ${color.rgb.b})</td> <!-- Added RGB cell -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500 font-mono">RGB(${color.rgb.r}, ${color.rgb.g}, ${color.rgb.b})</td>
                     `;
                     tableBody.appendChild(row);
                 });
@@ -510,12 +572,25 @@
 
             function handleSearch() {
                 const query = searchInput.value.toLowerCase();
-                const filteredData = colorData.filter(color => 
+                currentData = colorData.filter(color => 
                     color.english.toLowerCase().includes(query) ||
                     color.indonesian.toLowerCase().includes(query) ||
                     color.malay.toLowerCase().includes(query)
                 );
-                populateTable(filteredData);
+                populateTable(currentData);
+            }
+
+            function handleSort(field) {
+                if (currentSort.field === field) {
+                    // Toggle direction if same field
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    // New field, default to ascending
+                    currentSort.field = field;
+                    currentSort.direction = 'asc';
+                }
+                updateSortIndicators(currentSort.field, currentSort.direction);
+                populateTable(currentData);
             }
 
             colorPicker = new iro.ColorPicker(colorPickerContainer, {
@@ -546,6 +621,15 @@
             specificitySlider.addEventListener('input', () => updateMatches(colorPicker.color));
             searchInput.addEventListener('input', handleSearch);
 
+            // Add sort event listeners to headers
+            document.querySelectorAll('[data-sort]').forEach(header => {
+                header.addEventListener('click', () => {
+                    handleSort(header.dataset.sort);
+                });
+            });
+
+            // Initialize with data sorted by English (ascending)
+            updateSortIndicators(currentSort.field, currentSort.direction);
             populateTable(colorData);
             updateMatches(colorPicker.color);
 
