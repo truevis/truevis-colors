@@ -12,7 +12,7 @@ A fully functional color matching application that translates colors between Eng
 - **Multilingual Color Names**: Learn how to say "magenta" in three languages nobody asked about
 - **Real-time Matching**: Watch colors get matched in RGB space using Euclidean distance (fancy words for "close enough")
 - **Adjustable Specificity**: A slider that goes from "exactly this shade" to "eh, close enough"
-- **Searchable Database**: 400+ colors
+- **Searchable Database**: 400+ colors, sortable
 - **Responsive Design**: Works on your phone, tablet, and whatever other screens you're addicted to
 
 ## Technical Details (for the three people who care)
@@ -22,7 +22,7 @@ Built with:
 - Tailwind CSS (because writing actual CSS is for suckers)
 - iro.js color picker (because reinventing the wheel is overrated)
 - Pure JavaScript (no frameworks, we're old school like that)
-- Client-side everything (because servers are expensive)
+- Client-side everything
 - Vibe-coded initially with Gemini 2.5 Flash
 
 ## Data Source
