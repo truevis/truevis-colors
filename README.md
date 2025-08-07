@@ -2,6 +2,8 @@
 
 An interactive multilingual color explorer that lets you play with colors in three languages while pretending to be productive. Because apparently we needed another trilingual color tool.
 
+An example of bringing old documents to life, interactvely.
+
 ## What fresh hell is this?
 
 A fully functional color matching application that translates colors between English, Indonesian, and Malay. Features a color wheel for the visually inclined and a massive table for the data nerds.
@@ -25,8 +27,10 @@ Built with:
 - Client-side everything
 - Vibe-coded initially with Gemini 2.5 Flash
 
-## Data Source
+## Etc.
 
 Based on the "Daftar Istilah Warna" (1984) https://repositori.kemendikdasmen.go.id/1698/1/Daftar%20Istillah%20Warna%20%28%201984%20%29.pdf because apparently 40-year-old multilingual color lists are still relevant.
 
-Sponsored by truevis.com, presumably because they have nothing better to do.
+Live at https://aifab.xyz/colors/
+
+Sponsored by https://truevis.com , presumably because they have nothing better to do.
